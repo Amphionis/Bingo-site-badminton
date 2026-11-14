@@ -404,7 +404,10 @@ $("grid").addEventListener("click", e => {
 });
 $("newBtn").addEventListener("click", async () => {
   const marked = state.mask !== FREE_BIT;
-  if (marked && !(await ask("Nieuwe kaart nemen? Je afgestreepte vakjes ben je dan kwijt.", "Ja, nieuwe kaart", "Nee, houden"))) return;
+  const vraag = marked
+    ? "Nieuwe kaart nemen? Je huidige kaart en je afgestreepte vakjes ben je dan kwijt."
+    : "Nieuwe kaart nemen? Je huidige kaart ben je dan kwijt.";
+  if (!(await ask(vraag, "Ja, nieuwe kaart", "Nee, houden"))) return;
   state = { seed: newSeed(), mask: FREE_BIT };
   save(); render();
 });
