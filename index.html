@@ -1,0 +1,444 @@
+<!DOCTYPE html>
+<html lang="nl">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="theme-color" content="#f5f6f2">
+<title>Badminton Bingo</title>
+<style>
+  :root {
+    /* thema 1: shuttle (donker + felgeel) */
+    --bg: #0a0e0d; --surface: #131917; --border: #25302b; --text: #edf2ee; --muted: #87948d;
+    --accent: #d4ff3a; --ink: #0a0e0d; --row: #ffffff; --row-ink: #0a0e0d; --court: rgba(255,255,255,.07);
+    --shuttle: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%23000' stroke-width='1.6' stroke-linecap='round' stroke-linejoin='round'%3E%3Ccircle cx='6.2' cy='17.8' r='3.2'/%3E%3Cpath d='M7.6 14.9 14.5 3.2 20.8 9.5 9.1 16.4M10.2 11.2l2.6 2.6M12.4 7.4l4.2 4.2M9.6 15.4 17.6 6.4'/%3E%3C/svg%3E");
+  }
+  html[data-theme="baan"] {      /* baangroen + wit + geel */
+    --bg: #0b3d2e; --surface: #0f4a38; --border: #1d604b; --text: #f3f8f4; --muted: #9dc2b3;
+    --accent: #ffd23f; --ink: #0b2a20; --row: #ffffff; --row-ink: #0b2a20; --court: rgba(255,255,255,.16);
+  }
+  html[data-theme="licht"] {     /* licht + baangroen */
+    --bg: #f5f6f2; --surface: #ffffff; --border: #dfe4dc; --text: #121614; --muted: #6c7770;
+    --accent: #0e8a5f; --ink: #ffffff; --row: #121614; --row-ink: #ffffff; --court: rgba(0,0,0,.06);
+  }
+  html[data-theme="nacht"] {     /* nachtblauw + oranje */
+    --bg: #0b1020; --surface: #131a30; --border: #263050; --text: #eef1f8; --muted: #8b95b3;
+    --accent: #ff7a3d; --ink: #160a03; --row: #ffffff; --row-ink: #0b1020; --court: rgba(255,255,255,.07);
+  }
+  html[data-theme="veren"] {     /* veerwit + kurkrood */
+    --bg: #f3eee6; --surface: #fbf8f3; --border: #e2d9cb; --text: #1d1a17; --muted: #81776a;
+    --accent: #c8322b; --ink: #ffffff; --row: #1d1a17; --row-ink: #fbf8f3; --court: rgba(60,40,20,.08);
+  }
+  * { box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
+  html, body { margin: 0; }
+  body {
+    min-height: 100vh;
+    min-height: 100dvh;
+    font-family: system-ui, -apple-system, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+    color: var(--text);
+    background: var(--bg);
+    padding: calc(18px + env(safe-area-inset-top)) 12px calc(24px + env(safe-area-inset-bottom));
+    overflow-x: hidden;
+  }
+  /* baanlijnen op de achtergrond */
+  .court { position: fixed; inset: 10px; border: 1px solid var(--court); pointer-events: none; z-index: 0; }
+  .court::before { content: ""; position: absolute; left: 50%; top: 0; bottom: 0; border-left: 1px solid var(--court); }
+  .court::after { content: ""; position: absolute; left: 0; right: 0; top: 36%; bottom: 36%;
+    border-top: 1px solid var(--court); border-bottom: 1px solid var(--court); }
+  .wrap { position: relative; z-index: 1; max-width: 520px; margin: 0 auto; }
+
+  header { display: flex; align-items: center; gap: 12px; }
+  .logo { width: 44px; height: 44px; flex: none; border-radius: 12px; background: var(--accent); position: relative; }
+  .logo::after { content: ""; position: absolute; inset: 8px; background: var(--ink); -webkit-mask: var(--shuttle) center / contain no-repeat; mask: var(--shuttle) center / contain no-repeat; }
+  .eyebrow { margin: 0; font-size: 11px; font-weight: 600; letter-spacing: .22em; text-transform: uppercase; color: var(--muted); }
+  h1 { margin: 1px 0 0; font-size: 30px; line-height: 1; font-weight: 800; letter-spacing: -.03em; }
+  h1 span { color: var(--accent); }
+  /* het net */
+  .net { height: 16px; margin: 16px 0 14px; border-top: 3px solid var(--text);
+    background:
+      repeating-linear-gradient(90deg, var(--muted) 0 1px, transparent 1px 8px),
+      repeating-linear-gradient(0deg, var(--muted) 0 1px, transparent 1px 8px);
+    -webkit-mask-image: linear-gradient(#000, transparent); mask-image: linear-gradient(#000, transparent); }
+
+  .status { display: flex; justify-content: space-between; align-items: baseline; gap: 10px; font-size: 13px; }
+  #lines { font-weight: 600; color: var(--muted); }
+  #lines.win { color: var(--accent); }
+  #count { font-variant-numeric: tabular-nums; color: var(--muted); font-weight: 600; }
+  .track { height: 4px; border-radius: 4px; background: var(--border); margin: 8px 0 14px; overflow: hidden; }
+  #bar { height: 100%; width: 4%; background: var(--accent); border-radius: 4px; transition: width .25s ease; }
+
+  .grid { display: grid; grid-template-columns: repeat(5, 1fr); gap: 6px; }
+  .cell {
+    position: relative;
+    aspect-ratio: 1 / 1;
+    border: 1px solid var(--border);
+    border-radius: 10px;
+    background: var(--surface);
+    color: var(--text);
+    font: inherit; font-weight: 600;
+    font-size: 13px; line-height: 1.15;
+    padding: 4px;
+    display: flex; align-items: center; justify-content: center;
+    text-align: center;
+    overflow: hidden;
+    cursor: pointer;
+    transition: transform .1s, background .15s, color .15s, border-color .15s;
+    -webkit-user-select: none; user-select: none;
+    touch-action: manipulation;
+  }
+  .cell .t { display: block; position: relative; z-index: 1; }
+  .cell.brk .t { max-width: 100%; overflow-wrap: anywhere; hyphens: auto; -webkit-hyphens: auto; }
+  .cell:active { transform: scale(.95); }
+  .cell.on { background: var(--accent); border-color: var(--accent); color: var(--ink); }
+  .cell.on::after { content: ""; position: absolute; right: 2px; bottom: 2px; width: 16px; height: 16px;
+    background: currentColor; -webkit-mask: var(--shuttle) center / contain no-repeat; mask: var(--shuttle) center / contain no-repeat; opacity: .5; }
+  .cell.free { cursor: default; letter-spacing: .08em; font-size: 10px; }
+  .cell.line { background: var(--row); border-color: var(--row); color: var(--row-ink); animation: pop .35s; }
+  @keyframes pop { 50% { transform: scale(1.07); } }
+
+  .actions { display: flex; gap: 8px; margin-top: 16px; }
+  .btn {
+    flex: 1; font: inherit; font-weight: 700; font-size: 15px;
+    border: 1px solid var(--border); border-radius: 12px; padding: 14px 8px; cursor: pointer;
+    color: var(--text); background: transparent;
+    transition: transform .1s;
+  }
+  .btn:active { transform: scale(.97); }
+  .btn.primary { background: var(--accent); border-color: var(--accent); color: var(--ink); }
+  .hint { margin: 16px 0 0; font-size: 12px; color: var(--muted); line-height: 1.5; }
+
+  .banner { position: fixed; inset: 0; display: none; align-items: center; justify-content: center;
+    pointer-events: none; z-index: 20; background: color-mix(in srgb, var(--bg) 78%, transparent); }
+  .banner.show { display: flex; }
+  .banner div {
+    font-size: clamp(44px, 15vw, 96px); font-weight: 900; letter-spacing: -.04em; text-align: center; line-height: .95;
+    color: var(--accent); animation: bingo 2.4s ease-out forwards;
+  }
+  @keyframes bingo {
+    0% { transform: scale(.85); opacity: 0; }
+    12% { transform: scale(1); opacity: 1; }
+    82% { transform: scale(1); opacity: 1; }
+    100% { transform: scale(1.04); opacity: 0; }
+  }
+  canvas#confetti { position: fixed; inset: 0; width: 100%; height: 100%; pointer-events: none; z-index: 25; }
+
+  dialog { border: 1px solid var(--border); border-radius: 16px; padding: 20px; max-width: min(92vw, 380px);
+    font-family: inherit; color: var(--text); background: var(--surface); }
+  dialog::backdrop { background: rgba(0,0,0,.65); }
+  dialog p { margin: 0 0 18px; font-size: 15px; line-height: 1.45; }
+  dialog .row { display: flex; gap: 8px; }
+  .toast { position: fixed; left: 50%; bottom: calc(18px + env(safe-area-inset-bottom));
+    transform: translateX(-50%); background: var(--text); color: var(--ink); font-size: 14px; font-weight: 600;
+    padding: 10px 16px; border-radius: 999px; opacity: 0; transition: opacity .2s;
+    pointer-events: none; z-index: 30; max-width: 90vw; text-align: center; }
+  .toast.show { opacity: 1; }
+  @media (prefers-reduced-motion: reduce) {
+    .cell, .cell.line, .banner div, #bar { animation: none; transition: none; }
+  }
+</style>
+</head>
+<body>
+<div class="court" aria-hidden="true"></div>
+<div class="wrap">
+  <header>
+    <div class="logo" aria-hidden="true"></div>
+    <div>
+      <p class="eyebrow">Badminton</p>
+      <h1>Bingo<span>.</span></h1>
+    </div>
+  </header>
+  <div class="net" aria-hidden="true"></div>
+
+  <div class="status">
+    <span id="lines">Doel: 1 rij</span>
+    <span id="count">1 / 25</span>
+  </div>
+  <div class="track"><div id="bar"></div></div>
+
+  <main class="grid" id="grid"></main>
+
+  <div class="actions">
+    <button class="btn" id="newBtn" type="button">Nieuwe kaart</button>
+    <button class="btn primary" id="shareBtn" type="button">Deel met de groep</button>
+  </div>
+  <p class="hint">Eerst een rij, daarna de volle kaart. Je kaart wordt op deze telefoon bewaard. De link in je adresbalk bevat jouw kaart; deel met anderen via de knop, anders krijgen zij jouw kaart.</p>
+</div>
+
+<canvas id="confetti"></canvas>
+<div class="banner" id="banner"><div id="bannerText">BINGO!</div></div>
+<div class="toast" id="toast"></div>
+
+<dialog id="dlg">
+  <p id="dlgText"></p>
+  <div class="row">
+    <button class="btn" id="dlgNo" type="button"></button>
+    <button class="btn primary" id="dlgYes" type="button"></button>
+  </div>
+</dialog>
+
+<script>
+/* ====== Kleurenschema: "shuttle", "baan", "licht", "nacht" of "veren" ====== */
+const THEMA = "licht";
+document.documentElement.dataset.theme = THEMA;
+document.querySelector('meta[name="theme-color"]').content =
+  getComputedStyle(document.documentElement).getPropertyValue("--bg").trim();
+
+/* ====== Pas hier de opmerkingen aan (minimaal 24) ====== */
+const ITEMS = [
+  "Toch een halve hamburger",
+  "Het licht aan de shuttle",
+  "Het net hangt niet goed",
+  "De lichten zijn te fel",
+  "Krijg de shuttle niet achterin",
+  "Kom op, focus",
+  "Kan beter stoppen",
+  "Ik sla alleen maar uit",
+  "Kom op",
+  "Racket wisselen",
+  "In-/uit-discussie",
+  "Wel/niet vouwen-discussie",
+  "Zal ik 'm ff testen",
+  "3-setter verloren",
+  "(Verlenging) 2 punten verschil",
+  "30 punten voor of tegen",
+  "Baan is glad",
+  "Klagen over de zaal",
+  "Tegenstander loopt een mentaal spelletje te spelen",
+  "Ik wil naar mn bed",
+  "Minder uitslaan",
+  "Servicefout",
+  "Sukkel",
+  "'Is de Heer'",
+  "Te laat aankomen",
+  "Spullen laten slingeren",
+  "6-9 nice",
+  "Nah",
+  "Iemand anders de schuld geven",
+  "Ik ga alvast maar boven",
+  "Je kan niet altijd 6 gooien",
+  "We doen maar een drankje",
+  "Kom morgen mn bed niet meer uit",
+  "Ik heb last van...",
+  "Kan je mn flesje water vullen",
+  "Dextrootje",
+  "Wie wil er tellen?",
+  "Wie speelt wat?",
+  "Temperatuur",
+  "Het zit ook allemaal net niet mee",
+  "Niels, is dat niet iets voor jou"
+];
+/* ======================================================== */
+
+const FREE = 12, FREE_BIT = 1 << FREE, KEY = "badminton-bingo-v1";
+const LINES = [];
+for (let i = 0; i < 5; i++) {
+  LINES.push([0,1,2,3,4].map(j => i * 5 + j));
+  LINES.push([0,1,2,3,4].map(j => j * 5 + i));
+}
+LINES.push([0,6,12,18,24], [4,8,12,16,20]);
+
+let state = { seed: 0, mask: FREE_BIT };
+let prevRow = false, prevFull = false;
+const $ = id => document.getElementById(id);
+
+/* ---------- opslag ---------- */
+function loadLocal() {
+  try {
+    const s = JSON.parse(localStorage.getItem(KEY));
+    if (s && Number.isInteger(s.seed) && Number.isInteger(s.mask)) return s;
+  } catch (e) {}
+  return null;
+}
+function parseHash() {
+  const m = /^#k=([0-9a-z]+)-([0-9a-z]+)$/.exec(location.hash);
+  if (!m) return null;
+  const seed = parseInt(m[1], 36), mask = parseInt(m[2], 36);
+  if (!Number.isFinite(seed) || !Number.isFinite(mask) || seed > 0xFFFFFFFF || mask > 0x1FFFFFF) return null;
+  return { seed: seed >>> 0, mask: (mask | FREE_BIT) >>> 0 };
+}
+function save() {
+  try { localStorage.setItem(KEY, JSON.stringify(state)); } catch (e) {}
+  try { history.replaceState(null, "", "#k=" + state.seed.toString(36) + "-" + state.mask.toString(36)); } catch (e) {}
+}
+function newSeed() {
+  try { return crypto.getRandomValues(new Uint32Array(1))[0]; }
+  catch (e) { return Math.floor(Math.random() * 0xFFFFFFFF) >>> 0; }
+}
+
+/* ---------- kaart ---------- */
+function rng(seed) {
+  let a = seed >>> 0;
+  return function () {
+    a = (a + 0x6D2B79F5) >>> 0;
+    let t = a;
+    t = Math.imul(t ^ (t >>> 15), t | 1);
+    t ^= t + Math.imul(t ^ (t >>> 7), t | 61);
+    return ((t ^ (t >>> 14)) >>> 0) / 4294967296;
+  };
+}
+function cardItems(seed) {
+  const r = rng(seed), a = ITEMS.slice();
+  for (let i = a.length - 1; i > 0; i--) {
+    const j = Math.floor(r() * (i + 1));
+    [a[i], a[j]] = [a[j], a[i]];
+  }
+  const out = a.slice(0, 24);
+  out.splice(FREE, 0, "GRATIS");
+  return out;
+}
+function render() {
+  const grid = $("grid"), items = cardItems(state.seed);
+  grid.innerHTML = "";
+  items.forEach((txt, i) => {
+    const b = document.createElement("button");
+    b.type = "button";
+    b.className = "cell" + (i === FREE ? " free" : "");
+    b.dataset.i = i;
+    const s = document.createElement("span");
+    s.className = "t";
+    s.textContent = txt;
+    b.appendChild(s);
+    grid.appendChild(b);
+  });
+  fitText();
+  update(false);
+}
+function fitText() {
+  document.querySelectorAll(".cell").forEach(c => {
+    const over = () => c.scrollHeight > c.clientHeight + 1 || c.scrollWidth > c.clientWidth + 1;
+    const shrink = (from, to) => {
+      let size = from;
+      c.style.fontSize = size + "px";
+      while (size > to && over()) { size -= 0.5; c.style.fontSize = size + "px"; }
+    };
+    c.classList.remove("brk");
+    shrink(14, 9);                       // eerst hele woorden, kleiner lettertype
+    if (over()) { c.classList.add("brk"); shrink(11, 7); }   // anders woorden afbreken
+  });
+}
+function update(celebrate) {
+  const cells = document.querySelectorAll(".cell");
+  const done = LINES.filter(l => l.every(i => state.mask & (1 << i)));
+  const inLine = new Set(done.flat());
+  let n = 0;
+  cells.forEach((c, i) => {
+    const on = !!(state.mask & (1 << i));
+    if (on) n++;
+    c.classList.toggle("on", on);
+    c.classList.toggle("line", inLine.has(i));
+    c.setAttribute("aria-pressed", on);
+  });
+  $("count").textContent = n + " / 25";
+  $("bar").style.width = (n * 4) + "%";
+  const full = n === 25, row = done.length > 0;
+  const lp = $("lines");
+  // Ronde 1: een rij (horizontaal, verticaal of diagonaal). Ronde 2: de volle kaart.
+  lp.textContent = full ? "VOLLE KAART!" : row ? "Rij binnen! Volle kaart: nog " + (25 - n) : "Doel: 1 rij";
+  lp.classList.toggle("win", row);
+  if (celebrate) {
+    if (full && !prevFull) party("VOLLE KAART!", true);
+    else if (row && !prevRow) party("BINGO!", false);
+  }
+  prevRow = row; prevFull = full;
+}
+
+/* ---------- feest ---------- */
+function party(text, big) {
+  if (navigator.vibrate) { try { navigator.vibrate([80, 60, 80, 60, 200]); } catch (e) {} }
+  const b = $("banner");
+  $("bannerText").textContent = text;
+  b.classList.remove("show"); void b.offsetWidth; b.classList.add("show");
+  setTimeout(() => b.classList.remove("show"), 2500);
+  if (matchMedia("(prefers-reduced-motion: reduce)").matches) return;
+  const cv = $("confetti"), ctx = cv.getContext("2d");
+  const dpr = Math.min(window.devicePixelRatio || 1, 2);
+  cv.width = innerWidth * dpr; cv.height = innerHeight * dpr;
+  const cs = getComputedStyle(document.documentElement), v = k => cs.getPropertyValue(k).trim();
+  const colors = [v("--accent"), v("--text"), v("--muted"), v("--accent")];
+  const P = Array.from({ length: big ? 320 : 140 }, () => ({
+    x: Math.random() * cv.width, y: -Math.random() * cv.height * 0.5,
+    vx: (Math.random() - 0.5) * 4 * dpr, vy: (2 + Math.random() * 5) * dpr,
+    s: (5 + Math.random() * 7) * dpr, r: Math.random() * 6.28, vr: (Math.random() - 0.5) * 0.3,
+    c: colors[Math.floor(Math.random() * colors.length)]
+  }));
+  const start = performance.now();
+  (function frame(now) {
+    ctx.clearRect(0, 0, cv.width, cv.height);
+    if (now - start > (big ? 6000 : 3500)) return;
+    for (const p of P) {
+      p.x += p.vx; p.y += p.vy; p.r += p.vr; p.vy += 0.05 * dpr;
+      ctx.save(); ctx.translate(p.x, p.y); ctx.rotate(p.r);
+      ctx.fillStyle = p.c; ctx.fillRect(-p.s / 2, -p.s / 4, p.s, p.s / 2);
+      ctx.restore();
+    }
+    requestAnimationFrame(frame);
+  })(start);
+}
+
+/* ---------- dialoog en toast ---------- */
+function ask(text, yes, no) {
+  const d = $("dlg");
+  $("dlgText").textContent = text; $("dlgYes").textContent = yes; $("dlgNo").textContent = no;
+  if (typeof d.showModal !== "function") return Promise.resolve(confirm(text));
+  return new Promise(res => {
+    const done = v => { $("dlgYes").onclick = $("dlgNo").onclick = d.oncancel = null; d.close(); res(v); };
+    $("dlgYes").onclick = () => done(true);
+    $("dlgNo").onclick = () => done(false);
+    d.oncancel = e => { e.preventDefault(); done(false); };
+    d.showModal();
+  });
+}
+let toastTimer;
+function toast(msg) {
+  const t = $("toast"); t.textContent = msg; t.classList.add("show");
+  clearTimeout(toastTimer); toastTimer = setTimeout(() => t.classList.remove("show"), 2600);
+}
+
+/* ---------- acties ---------- */
+$("grid").addEventListener("click", e => {
+  const c = e.target.closest(".cell");
+  if (!c) return;
+  const i = +c.dataset.i;
+  if (i === FREE) return;
+  state.mask = (state.mask ^ (1 << i)) >>> 0;
+  save(); update(true);
+});
+$("newBtn").addEventListener("click", async () => {
+  const marked = state.mask !== FREE_BIT;
+  if (marked && !(await ask("Nieuwe kaart nemen? Je afgestreepte vakjes ben je dan kwijt.", "Ja, nieuwe kaart", "Nee, houden"))) return;
+  state = { seed: newSeed(), mask: FREE_BIT };
+  save(); render();
+});
+$("shareBtn").addEventListener("click", async () => {
+  const url = location.origin + location.pathname;
+  const data = { title: "Badminton Bingo", text: "Badminton Bingo! Pak je eigen kaart:", url };
+  try {
+    if (navigator.share) { await navigator.share(data); return; }
+    await navigator.clipboard.writeText(url);
+    toast("Link gekopieerd, plak hem in de groep");
+  } catch (e) {
+    if (e && e.name === "AbortError") return;
+    toast("Kopieer deze link: " + url);
+  }
+});
+let rt;
+addEventListener("resize", () => { clearTimeout(rt); rt = setTimeout(fitText, 150); });
+
+/* ---------- start ---------- */
+(async function init() {
+  const local = loadLocal(), fromLink = parseHash();
+  if (fromLink && local && fromLink.seed === local.seed) {
+    state = local;
+  } else if (fromLink) {
+    const restore = await ask(
+      "Deze link bevat een opgeslagen kaart. Is dat jouw kaart en wil je verder waar je was?",
+      "Ja, herstel mijn kaart", "Nee, " + (local ? "mijn eigen kaart" : "nieuwe kaart"));
+    state = restore ? fromLink : (local || { seed: newSeed(), mask: FREE_BIT });
+  } else {
+    state = local || { seed: newSeed(), mask: FREE_BIT };
+  }
+  state.mask = (state.mask | FREE_BIT) >>> 0;
+  save(); render();
+})();
+</script>
+</body>
+</html>
